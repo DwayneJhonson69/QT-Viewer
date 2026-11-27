@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="QT-Viewer Logo" width="160">
+</p>
+
 # QT-Viewer
 
 An open-source, browser-based player and inspector for **Spine 2D** & **Unity (`.unity3d`)** game assets. Designed to run both **100% statically on GitHub Pages** (drag-and-drop local files directly in your browser) and locally with full scene/manifest support.

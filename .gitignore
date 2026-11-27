@@ -12,6 +12,7 @@ Tools/
 *.atlas
 *.atlas.txt
 *.png
+!assets/logo.png
 *.webp
 *.jpg
 *.jpeg
