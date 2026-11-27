@@ -1,0 +1,2004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QT-Viewer — Open-Source Spine &amp; Unity Asset Player</title>
+  <link rel="stylesheet" href="./vendor/spine-player.css">
+  <style>
+    :root {
+      --bg-dark: #0f111a;
+      --panel-bg: rgba(22, 26, 38, 0.94);
+      --accent: #5e6ad2;
+      --accent-hover: #727ee8;
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #e6e8ec;
+      --text-muted: #8b92a5;
+      --green: #10b981;
+      --amber: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html {
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+    }
+
+    #app-layout {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* Interactive Stage */
+    #stage-container {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #1b2033 0%, #0c0e17 100%);
+    }
+
+    #character-mount {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Control Sidebar */
+    #sidebar {
+      width: 390px;
+      height: 100%;
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+    }
+
+    .sidebar-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    button.active {
+      background: var(--accent);
+      border-color: var(--accent-hover);
+      color: #fff;
+    }
+
+    /* Unified Play/Pause Button */
+    #btn-toggle-play {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      font-weight: 600;
+      background: rgba(94, 106, 210, 0.25);
+      border-color: var(--accent);
+      color: #a5b4fc;
+    }
+
+    #btn-toggle-play:hover {
+      background: rgba(94, 106, 210, 0.4);
+    }
+
+    #btn-toggle-play.paused {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--green);
+      color: #34d399;
+    }
+
+    /* Speed Buttons */
+    .speed-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-speed {
+      flex: 1;
+      padding: 6px 8px;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    /* Interactive Reaction Buttons */
+    button.btn-reaction {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    button.btn-reaction:hover {
+      background: rgba(245, 158, 11, 0.25);
+    }
+
+    /* Environmental Loop Chips */
+    button.btn-env-loop {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.35);
+      color: #34d399;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button.btn-env-loop.off {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      text-decoration: line-through;
+    }
+
+    /* Intimate Sequence Buttons (In -> Loop -> Out) */
+    .btn-sequence {
+      background: rgba(236, 72, 153, 0.15);
+      border-color: rgba(236, 72, 153, 0.4);
+      color: #f472b6;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+    .btn-sequence:hover {
+      background: rgba(236, 72, 153, 0.25);
+      border-color: rgba(236, 72, 153, 0.7);
+    }
+    .btn-sequence.active-sequence {
+      background: #db2777;
+      border-color: #f472b6;
+      color: #fff;
+      box-shadow: 0 0 14px rgba(219, 39, 119, 0.5);
+    }
+
+    select {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    select:focus {
+      border-color: var(--accent);
+    }
+
+    .char-info-card {
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .char-info-card div span {
+      color: var(--text-muted);
+    }
+
+    #click-toast {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #34d399;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 50;
+    }
+
+    /* Floating Zoom Controls */
+    #zoom-toolbar {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(15, 17, 26, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 8px;
+      z-index: 50;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+
+    #zoom-toolbar button {
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid transparent;
+      color: var(--text);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    #zoom-toolbar button:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    #btn-toggle-bg.off, #btn-toggle-voice.off {
+      opacity: 0.55;
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .level-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .level-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text);
+    }
+
+    .level-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 10px rgba(94, 106, 210, 0.4);
+    }
+
+    .voice-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s;
+    }
+
+    .voice-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--accent);
+    }
+
+    /* Adjust Mode */
+    #btn-toggle-adjust.active {
+      background: rgba(245, 158, 11, 0.35) !important;
+      border-color: rgba(245, 158, 11, 0.7) !important;
+      color: #fbbf24 !important;
+    }
+
+    #adjust-panel {
+      position: absolute;
+      bottom: 50px;
+      left: 10px;
+      z-index: 20;
+      background: rgba(10, 12, 22, 0.92);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 8px;
+      padding: 14px;
+      display: none;
+      width: 290px;
+      backdrop-filter: blur(10px);
+    }
+
+    #adjust-panel .adj-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fbbf24;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    #adjust-panel .adj-row {
+      margin-bottom: 8px;
+    }
+
+    #adjust-panel .adj-row label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    #adjust-panel input[type="range"] {
+      width: 100%;
+      accent-color: #f59e0b;
+      height: 4px;
+    }
+
+    #adjust-panel .adj-buttons {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    #adjust-panel .adj-buttons button {
+      flex: 1;
+      padding: 7px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    #btn-adj-save {
+      background: rgba(16, 185, 129, 0.2) !important;
+      border-color: rgba(16, 185, 129, 0.4) !important;
+      color: #34d399 !important;
+    }
+
+    #btn-adj-save:hover { background: rgba(16, 185, 129, 0.35) !important; }
+
+    #btn-adj-reset {
+      background: rgba(239, 68, 68, 0.15) !important;
+      border-color: rgba(239, 68, 68, 0.3) !important;
+      color: #f87171 !important;
+    }
+
+    #btn-adj-reset:hover { background: rgba(239, 68, 68, 0.25) !important; }
+
+    /* Crop Overlay */
+    #crop-overlay {
+      position: absolute;
+      z-index: 8;
+      border: 2px dashed rgba(245, 158, 11, 0.6);
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+    }
+
+    .crop-handle {
+      position: absolute;
+      background: #f59e0b;
+      pointer-events: all;
+      z-index: 9;
+      border-radius: 2px;
+      opacity: 0.9;
+    }
+
+    .crop-handle:hover { opacity: 1; transform: scale(1.3); }
+
+    .crop-handle-top, .crop-handle-bottom {
+      height: 6px;
+      left: 30%;
+      width: 40%;
+      cursor: ns-resize;
+    }
+
+    .crop-handle-left, .crop-handle-right {
+      width: 6px;
+      top: 30%;
+      height: 40%;
+      cursor: ew-resize;
+    }
+
+    .crop-handle-top { top: -3px; }
+    .crop-handle-bottom { bottom: -3px; }
+    .crop-handle-left { left: -3px; }
+    .crop-handle-right { right: -3px; }
+
+    /* Scene clip (applied in normal mode when crop is set) */
+    #scene-content {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    /* Local Drop Zone & Empty Stage Welcome */
+    .local-loader-box {
+      border: 1.5px dashed rgba(94, 106, 210, 0.45);
+      background: rgba(94, 106, 210, 0.08);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+    }
+    .local-loader-box.dragover {
+      border-color: var(--accent-hover);
+      background: rgba(94, 106, 210, 0.22);
+      color: #fff;
+    }
+    .local-loader-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .local-loader-actions button {
+      flex: 1;
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+    .stage-welcome {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 3;
+      padding: 24px;
+    }
+    .stage-welcome-card {
+      max-width: 540px;
+      background: rgba(15, 17, 26, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      text-align: center;
+      line-height: 1.6;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+    }
+    .stage-welcome-card h2 {
+      font-size: 18px;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .stage-welcome-card code {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #c7d2fe;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="app-layout">
+    <!-- Main Interactive Stage -->
+    <div id="stage-container">
+      <div id="click-toast">✨ Clicked! Reaction triggered</div>
+      <div id="zoom-toolbar">
+        <button id="btn-zoom-in" title="Zoom In (+)">➕</button>
+        <button id="btn-zoom-reset" title="Reset Zoom (100%)">100%</button>
+        <button id="btn-zoom-out" title="Zoom Out (−)">➖</button>
+        <button id="btn-toggle-bg" title="Toggle Background Image" style="font-size:11px; padding:6px 10px;">🖼️ BG: ON</button>
+        <button id="btn-toggle-voice" title="Toggle Voice / Audio" style="font-size:11px; padding:6px 10px;">🔊 Voice: ON</button>
+        <button id="btn-toggle-adjust" title="Toggle Adjust Mode" style="font-size:11px; padding:6px 10px;">✏️ Adjust</button>
+      </div>
+      <!-- Scene Content Wrapper (clippable for crop) -->
+      <div id="scene-content">
+        <!-- Stage Background Image (Synchronized with Spine Camera) -->
+        <div id="stage-bg-overlay" style="position:absolute; inset:0; pointer-events:none; z-index:1; overflow:hidden;">
+          <img id="stage-bg-img" alt="Scene Background" style="position:absolute; display:none; pointer-events:none;">
+        </div>
+        <div id="character-mount" style="position:relative; z-index:2;"></div>
+      </div>
+      <!-- Crop Overlay (adjust mode) -->
+      <div id="crop-overlay">
+        <div class="crop-handle crop-handle-top"></div>
+        <div class="crop-handle crop-handle-bottom"></div>
+        <div class="crop-handle crop-handle-left"></div>
+        <div class="crop-handle crop-handle-right"></div>
+      </div>
+      <!-- Adjust Mode Panel -->
+      <div id="adjust-panel">
+        <div class="adj-title">✏️ Adjust Mode — <span id="adj-scene-id">—</span></div>
+        <div class="adj-row">
+          <label>Scale <span id="adj-scale-val">1.00×</span></label>
+          <input type="range" id="adj-scale" min="0.2" max="3" step="0.02" value="1">
+        </div>
+        <div class="adj-row">
+          <label>X Offset <span id="adj-x-val">0</span></label>
+          <input type="range" id="adj-x" min="-2500" max="2500" step="5" value="0">
+        </div>
+        <div class="adj-row">
+          <label>Y Offset <span id="adj-y-val">0</span></label>
+          <input type="range" id="adj-y" min="-2500" max="2500" step="5" value="0">
+        </div>
+        <div class="adj-row" style="margin-top:8px;">
+          <label style="cursor:pointer;">
+            <span>Crop Window</span>
+            <input type="checkbox" id="adj-crop-toggle" style="accent-color:#f59e0b; cursor:pointer;">
+          </label>
+        </div>
+        <div class="adj-buttons">
+          <button id="btn-adj-save">💾 Save</button>
+          <button id="btn-adj-reset">🔄 Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Control Panel -->
+    <div id="sidebar">
+      <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <h1>QT-Viewer <span class="badge">Spine 4.1</span></h1>
+        <a href="./viewer.html" style="font-size:11px; color:var(--text-muted); text-decoration:none;">Quick Test ↗</a>
+      </div>
+
+      <div class="sidebar-scroll">
+        <!-- Local File / Folder Loader (works offline & on GitHub Pages) -->
+        <div class="local-loader-box" id="local-drop-zone">
+          <div><b>📂 Load Local Assets</b></div>
+          <div style="margin-top:4px; line-height:1.45;">
+            Drop <code>.skel</code>/<code>.json</code> + <code>.atlas</code> + <code>.png</code> (plus optional BG &amp; audio), or drop a <code>.unity3d</code> file to inspect its bundle header.
+          </div>
+          <div class="local-loader-actions">
+            <button type="button" id="btn-pick-files">📄 Pick Files</button>
+            <button type="button" id="btn-pick-folder">📁 Pick Folder</button>
+          </div>
+          <input type="file" id="input-local-files" multiple style="display:none;">
+          <input type="file" id="input-local-folder" webkitdirectory directory multiple style="display:none;">
+        </div>
+
+        <!-- Grouped Character Selector -->
+        <div id="char-group-section">
+          <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Character</span>
+            <span id="char-group-count" style="font-size:11px; color:var(--text-muted); font-weight:normal;"></span>
+          </div>
+          <select id="char-group-select">
+            <option value="">Loading hierarchy.json...</option>
+          </select>
+        </div>
+
+        <!-- Scene / Event Selector -->
+        <div id="scene-section">
+          <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Scene / Event</span>
+            <span id="scene-count" style="font-size:11px; color:var(--text-muted); font-weight:normal;"></span>
+          </div>
+          <select id="scene-select"></select>
+        </div>
+
+        <!-- Level / Part Selector -->
+        <div id="level-section">
+          <div class="section-title" id="level-section-title">Levels / Parts</div>
+          <div id="level-buttons-container" class="level-btn-group" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
+
+        <!-- Stage Background Selector -->
+        <div id="bg-section">
+          <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Stage Background</span>
+            <span id="bg-current-name" style="font-size:11px; color:var(--text-muted); font-weight:normal; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Auto</span>
+          </div>
+          <select id="bg-select" style="width:100%; padding:8px 10px; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text); border-radius:6px; font-size:12px; outline:none;"></select>
+        </div>
+
+        <!-- Info Card -->
+        <div id="info-card" class="char-info-card" style="display:none;">
+          <div><span>ID:</span> <b id="info-id">-</b></div>
+          <div><span>Spine Version:</span> <b id="info-ver">-</b></div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Background:</span>
+            <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:12px;">
+              <input type="checkbox" id="chk-bg" checked style="cursor:pointer; accent-color:var(--accent);">
+              <b id="info-bg" style="color:var(--accent)">ON</b>
+            </label>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Voice Audio:</span>
+            <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:12px;">
+              <input type="checkbox" id="chk-voice" checked style="cursor:pointer; accent-color:var(--accent);">
+              <b id="info-voice" style="color:var(--accent)">ON</b>
+            </label>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span>PMA (Alpha):</span>
+            <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:12px;">
+              <input type="checkbox" id="chk-pma" checked style="cursor:pointer; accent-color:var(--accent);">
+              <b id="info-pma" style="color:var(--accent)">true</b>
+            </label>
+          </div>
+
+          <div><span>Eye Blinking:</span> <b id="info-blink" style="color:var(--green)">Fixed (1.5s)</b></div>
+        </div>
+
+        <!-- Skin / Costume Selector -->
+        <div id="skin-section" style="display:none;">
+          <div class="section-title">Skin / Costume</div>
+          <select id="skin-select"></select>
+        </div>
+
+        <!-- Playback & Speed Controls -->
+        <div>
+          <div class="section-title">Playback Controls</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <!-- Start / Stop Button -->
+            <button id="btn-toggle-play">⏸ Pause</button>
+
+            <!-- Playback Speed -->
+            <div>
+              <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Speed Multiplier</div>
+              <div class="speed-group">
+                <button class="btn-speed" data-speed="0.5">0.5x</button>
+                <button class="btn-speed active" data-speed="1.0">1.0x</button>
+                <button class="btn-speed" data-speed="1.5">1.5x</button>
+                <button class="btn-speed" data-speed="2.0">2.0x</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stateful Intimate Sequences (In -> Loop -> Out) -->
+        <div id="sequences-section" style="display:none;">
+          <div class="section-title">Intimate Actions (In ➔ Loop ➔ Out)</div>
+          <div class="btn-group" id="sequences-btns"></div>
+        </div>
+
+        <!-- Interactive Reactions & Expressions -->
+        <div id="reactions-section" style="display:none;">
+          <div class="section-title">Interactive Reactions (Track 0)</div>
+          <div class="btn-group" id="reactions-btns"></div>
+        </div>
+
+        <!-- Environmental Scene Loops (Parallel Layers) -->
+        <div id="env-loops-section" style="display:none;">
+          <div class="section-title">Scene Environment Loops (Parallel)</div>
+          <div class="btn-group" id="env-loops-btns"></div>
+        </div>
+
+        <!-- Base Idle Loop Selector -->
+        <div id="idle-section" style="display:none;">
+          <div class="section-title">Base Body Loop (Track 0)</div>
+          <div class="btn-group" id="idle-btns"></div>
+        </div>
+
+        <!-- Audio & Voice Lines Section -->
+        <div id="audio-section" style="display:none;">
+          <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Voice & Audio Lines</span>
+            <span id="audio-count" style="font-size:11px; color:var(--text-muted); font-weight:normal;"></span>
+          </div>
+          <div id="audio-status" style="font-size:11px; color:var(--accent); margin-bottom:8px; min-height:16px;"></div>
+          <div id="audio-list" style="display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto; padding-right:4px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./vendor/spine-player.js"></script>
+  <script type="module">
+    import { SpineCharacter } from "./src/SpineCharacter.js";
+    import { readDroppedFiles, buildLocalSpineBundle } from "./src/localLoader.js";
+
+    let activeCharacter = null;
+    let manifestData = null;
+    let hierarchyData = null;
+    let localCharacterData = null;
+    let selectedGroup = null;
+    let selectedScene = null;
+    let selectedLevel = null;
+    let currentSpeed = 1.0;
+
+    const localDropZone = document.getElementById("local-drop-zone");
+    const btnPickFiles = document.getElementById("btn-pick-files");
+    const btnPickFolder = document.getElementById("btn-pick-folder");
+    const inputLocalFiles = document.getElementById("input-local-files");
+    const inputLocalFolder = document.getElementById("input-local-folder");
+    const charGroupSection = document.getElementById("char-group-section");
+    const bgSection = document.getElementById("bg-section");
+    const charGroupSelect = document.getElementById("char-group-select");
+    const charGroupCount = document.getElementById("char-group-count");
+    const sceneSection = document.getElementById("scene-section");
+    const sceneSelect = document.getElementById("scene-select");
+    const sceneCount = document.getElementById("scene-count");
+    const levelSection = document.getElementById("level-section");
+    const levelSectionTitle = document.getElementById("level-section-title");
+    const levelButtonsContainer = document.getElementById("level-buttons-container");
+
+    const skinSelect = document.getElementById("skin-select");
+    const mountEl = document.getElementById("character-mount");
+    const toastEl = document.getElementById("click-toast");
+
+    const infoCard = document.getElementById("info-card");
+    const infoId = document.getElementById("info-id");
+    const infoVer = document.getElementById("info-ver");
+    const infoPma = document.getElementById("info-pma");
+    const chkPma = document.getElementById("chk-pma");
+    const infoBlink = document.getElementById("info-blink");
+
+    // Media: Background & Voice controls
+    const stageBgImg = document.getElementById("stage-bg-img");
+    const bgSelect = document.getElementById("bg-select");
+    const bgCurrentName = document.getElementById("bg-current-name");
+    const btnToggleBg = document.getElementById("btn-toggle-bg");
+    const chkBg = document.getElementById("chk-bg");
+    const infoBg = document.getElementById("info-bg");
+    const btnToggleVoice = document.getElementById("btn-toggle-voice");
+    const chkVoice = document.getElementById("chk-voice");
+    const infoVoice = document.getElementById("info-voice");
+
+    const audioSection = document.getElementById("audio-section");
+    const audioCount = document.getElementById("audio-count");
+    const audioStatus = document.getElementById("audio-status");
+    const audioList = document.getElementById("audio-list");
+
+    let currentCharId = null;
+    let currentPmaOverride = null;
+    let bgEnabled = true;
+    let voiceEnabled = true;
+    let currentBgUrl = null;
+    let currentAudioMap = {};
+    let currentReactionPool = [];
+    let reactionPoolIndex = 0;
+    let activeAudio = null;
+
+    // Skin / Costume persistence across scenes
+    let userPreferredSkin = null;
+    try {
+      userPreferredSkin = localStorage.getItem("ae_preferred_skin") || null;
+    } catch (_) {}
+    const charSkinPreferences = {};
+
+    // Adjust Mode state
+    let adjustMode = false;
+    let sceneAdjustments = {};
+    const btnToggleAdjust = document.getElementById("btn-toggle-adjust");
+    const adjustPanel = document.getElementById("adjust-panel");
+    const adjSceneId = document.getElementById("adj-scene-id");
+    const adjScale = document.getElementById("adj-scale");
+    const adjScaleVal = document.getElementById("adj-scale-val");
+    const adjX = document.getElementById("adj-x");
+    const adjXVal = document.getElementById("adj-x-val");
+    const adjY = document.getElementById("adj-y");
+    const adjYVal = document.getElementById("adj-y-val");
+    const adjCropToggle = document.getElementById("adj-crop-toggle");
+    const cropOverlay = document.getElementById("crop-overlay");
+    const sceneContent = document.getElementById("scene-content");
+
+    const btnTogglePlay = document.getElementById("btn-toggle-play");
+    const speedBtns = document.querySelectorAll(".btn-speed");
+
+    const reactionsSection = document.getElementById("reactions-section");
+    const reactionsBtns = document.getElementById("reactions-btns");
+    const sequencesSection = document.getElementById("sequences-section");
+    const sequencesBtns = document.getElementById("sequences-btns");
+    const envLoopsSection = document.getElementById("env-loops-section");
+    const envLoopsBtns = document.getElementById("env-loops-btns");
+    const idleSection = document.getElementById("idle-section");
+    const idleBtns = document.getElementById("idle-btns");
+    const skinSection = document.getElementById("skin-section");
+
+    // Unified Play / Pause Button
+    btnTogglePlay.addEventListener("click", () => {
+      if (!activeCharacter) return;
+      const isPlaying = activeCharacter.togglePlay();
+      updatePlayButtonUI(isPlaying);
+    });
+
+    function updatePlayButtonUI(isPlaying) {
+      if (isPlaying) {
+        btnTogglePlay.textContent = "⏸ Pause";
+        btnTogglePlay.classList.remove("paused");
+      } else {
+        btnTogglePlay.textContent = "▶ Play";
+        btnTogglePlay.classList.add("paused");
+      }
+    }
+
+    // Speed Controls
+    speedBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const speed = parseFloat(btn.dataset.speed);
+        currentSpeed = speed;
+        speedBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        if (activeCharacter) {
+          activeCharacter.setSpeed(speed);
+        }
+        showToast(`Speed set to ${speed}x`);
+      });
+    });
+
+    // --- Audio Voice Engine ---
+    // Unlock browser audio context on any user interaction
+    document.addEventListener("pointerdown", () => {
+      if (window.AudioContext || window.webkitAudioContext) {
+        if (!window._audioCtx) {
+          window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (window._audioCtx.state === "suspended") {
+          window._audioCtx.resume();
+        }
+      }
+    }, { once: false });
+
+    function playVoice(actionName) {
+      if (!voiceEnabled) return;
+      let cand = null;
+      if (currentAudioMap) {
+        cand = currentAudioMap[actionName] 
+          || currentAudioMap[actionName.toLowerCase()]
+          || currentAudioMap[actionName.replace(/^action_/, "")]
+          || currentAudioMap[`action_${actionName}`]
+          || (actionName === "touch" ? currentAudioMap["touch"] : null);
+      }
+
+      // If no exact match, fallback to the character's reaction voice pool
+      if (!cand && currentReactionPool && currentReactionPool.length > 0) {
+        cand = currentReactionPool[reactionPoolIndex % currentReactionPool.length];
+        reactionPoolIndex++;
+      }
+
+      if (!cand) return;
+
+      if (activeAudio) {
+        activeAudio.pause();
+        activeAudio.currentTime = 0;
+      }
+      activeAudio = new Audio(cand);
+      activeAudio.volume = 0.95;
+      activeAudio.play().catch(e => console.warn("Voice play prevented:", e));
+
+      const fn = cand.split("/").pop();
+      if (audioStatus) {
+        audioStatus.textContent = `🔊 ${fn}`;
+        setTimeout(() => { if (audioStatus && audioStatus.textContent.includes(fn)) audioStatus.textContent = ""; }, 3500);
+      }
+    }
+
+    function renderAudioList(voices) {
+      if (!audioSection || !audioList) return;
+      audioList.innerHTML = "";
+      if (!voices || voices.length === 0) {
+        audioSection.style.display = "none";
+        return;
+      }
+      audioSection.style.display = "block";
+      audioCount.textContent = `${voices.length} lines`;
+
+      voices.forEach(v => {
+        const btn = document.createElement("button");
+        btn.className = "voice-btn";
+        btn.innerHTML = `<span>▶ ${v.name}</span> <span style="font-size:10px; opacity:0.6;">MP3</span>`;
+        btn.onclick = () => {
+          if (!voiceEnabled) setVoiceEnabled(true);
+          if (activeAudio) {
+            activeAudio.pause();
+            activeAudio.currentTime = 0;
+          }
+          activeAudio = new Audio(v.url);
+          activeAudio.volume = 0.95;
+          activeAudio.play().catch(e => console.warn(e));
+          if (audioStatus) audioStatus.textContent = `🔊 Playing: ${v.name}`;
+        };
+        audioList.appendChild(btn);
+      });
+    }
+
+    // --- Background & Voice Toggles ---
+    function setBgEnabled(enabled) {
+      bgEnabled = !!enabled;
+      if (btnToggleBg) {
+        btnToggleBg.textContent = `🖼️ BG: ${bgEnabled ? "ON" : "OFF"}`;
+        btnToggleBg.classList.toggle("off", !bgEnabled);
+      }
+      if (chkBg) chkBg.checked = bgEnabled;
+      if (infoBg) {
+        infoBg.textContent = bgEnabled ? "ON" : "OFF";
+        infoBg.style.color = bgEnabled ? "var(--accent)" : "var(--text-muted)";
+      }
+      updateBackgroundImage();
+      showToast(`Background Image: ${bgEnabled ? "ON" : "OFF"}`);
+    }
+
+    function setVoiceEnabled(enabled) {
+      voiceEnabled = !!enabled;
+      if (btnToggleVoice) {
+        btnToggleVoice.textContent = `🔊 Voice: ${voiceEnabled ? "ON" : "OFF"}`;
+        btnToggleVoice.classList.toggle("off", !voiceEnabled);
+      }
+      if (chkVoice) chkVoice.checked = voiceEnabled;
+      if (infoVoice) {
+        infoVoice.textContent = voiceEnabled ? "ON" : "OFF";
+        infoVoice.style.color = voiceEnabled ? "var(--accent)" : "var(--text-muted)";
+      }
+      if (!voiceEnabled && activeAudio) {
+        activeAudio.pause();
+      }
+      showToast(`Voice Audio: ${voiceEnabled ? "ON" : "OFF"}`);
+    }
+
+    if (btnToggleBg) btnToggleBg.onclick = () => setBgEnabled(!bgEnabled);
+    if (chkBg) chkBg.onchange = (e) => setBgEnabled(e.target.checked);
+    if (btnToggleVoice) btnToggleVoice.onclick = () => setVoiceEnabled(!voiceEnabled);
+    if (chkVoice) chkVoice.onchange = (e) => setVoiceEnabled(e.target.checked);
+
+    function updateBackgroundImage() {
+      if (!stageBgImg) return;
+      if (currentBgUrl && bgEnabled) {
+        stageBgImg.src = currentBgUrl;
+        stageBgImg.style.display = "block";
+        if (bgSelect && bgSelect.value !== currentBgUrl) {
+          bgSelect.value = currentBgUrl;
+        }
+        if (bgCurrentName) {
+          bgCurrentName.textContent = currentBgUrl.split("/").pop();
+          bgCurrentName.title = currentBgUrl;
+        }
+      } else {
+        stageBgImg.style.display = "none";
+        if (bgCurrentName) {
+          bgCurrentName.textContent = "OFF";
+        }
+      }
+      updateBackgroundImageTransform();
+    }
+
+    if (stageBgImg) {
+      stageBgImg.onload = updateBackgroundImageTransform;
+    }
+
+    function showWelcomeCard(title, bodyHtml) {
+      mountEl.innerHTML = `
+        <div class="stage-welcome">
+          <div class="stage-welcome-card">
+            <h2>${title}</h2>
+            <div style="font-size:13px;color:var(--text-muted);">${bodyHtml}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function handleLocalFiles(fileList) {
+      const bundle = await buildLocalSpineBundle(fileList);
+      if (bundle.ready) {
+        localCharacterData = {
+          id: bundle.id,
+          skeleton: bundle.skelKey,
+          atlas: bundle.atlasKey,
+          isJson: bundle.isJson,
+          rawDataURIs: bundle.rawDataURIs,
+          spineVersion: "4.1.x",
+          skins: [],
+          animations: [],
+          loops: [],
+          reactions: [],
+          envLoops: []
+        };
+        currentBgUrl = bundle.bgUrl || null;
+        currentAudioMap = {};
+        currentReactionPool = (bundle.voices || []).map(v => v.url);
+        reactionPoolIndex = 0;
+        updateBackgroundImage();
+        renderAudioList(bundle.voices || []);
+        currentPmaOverride = null;
+        await loadCharacter(bundle.id);
+        showToast(`Loaded local asset: ${bundle.id}`);
+        return;
+      }
+
+      if (bundle.unityBundles && bundle.unityBundles.length > 0) {
+        const rows = bundle.unityBundles.map(b =>
+          `<div style="margin-top:10px;padding:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;text-align:left;">` +
+          `<div><b>${b.fileName}</b> (${(b.size / 1024).toFixed(1)} KB)</div>` +
+          `<div>Signature: <code>${b.signature}</code>${b.formatVersion !== null && b.formatVersion !== undefined ? ` (format v${b.formatVersion})` : ""}</div>` +
+          (b.isUnityBundle ? `<div>Unity Version: <code>${b.unityVersion}</code> • Engine: <code>${b.engineVersion}</code></div>` : "") +
+          `</div>`
+        ).join("");
+        showWelcomeCard(
+          "📦 Unity AssetBundle Inspected",
+          `Detected <code>.unity3d</code> / <code>.bundle</code> file(s):${rows}` +
+          `<p style="margin-top:12px;">Full client-side extraction of Spine/assets directly from compressed <code>.unity3d</code> bundles is an active collaboration goal on GitHub. For now, extract <code>.skel</code> + <code>.atlas</code> + <code>.png</code> using AssetStudio and drop them here.</p>`
+        );
+        return;
+      }
+
+      showToast("Need .skel (or .json) + .atlas + .png files");
+    }
+
+    if (btnPickFiles) btnPickFiles.onclick = () => inputLocalFiles.click();
+    if (btnPickFolder) btnPickFolder.onclick = () => inputLocalFolder.click();
+    if (inputLocalFiles) inputLocalFiles.onchange = (e) => { if (e.target.files?.length) handleLocalFiles(e.target.files); };
+    if (inputLocalFolder) inputLocalFolder.onchange = (e) => { if (e.target.files?.length) handleLocalFiles(e.target.files); };
+
+    [localDropZone, document.getElementById("stage-container")].forEach(target => {
+      if (!target) return;
+      target.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        localDropZone?.classList.add("dragover");
+      });
+      target.addEventListener("dragleave", () => localDropZone?.classList.remove("dragover"));
+      target.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        localDropZone?.classList.remove("dragover");
+        const files = await readDroppedFiles(e.dataTransfer);
+        if (files.length) handleLocalFiles(files);
+      });
+    });
+
+    // --- Character & Scene & Level Grouping ---
+    async function init() {
+      // Load saved scene adjustments first
+      await loadAdjustments();
+      try {
+        const [hRes, mRes] = await Promise.all([
+          fetch("./characters/hierarchy.json?t=" + Date.now()),
+          fetch("./characters/characters.json?t=" + Date.now())
+        ]);
+        if (!hRes.ok || !mRes.ok) throw new Error("Manifest not present (static / GitHub Pages mode)");
+        hierarchyData = await hRes.json();
+        manifestData = await mRes.json();
+
+        const groups = hierarchyData.groups || [];
+        if (charGroupCount) charGroupCount.textContent = `${groups.length} characters`;
+
+        charGroupSelect.innerHTML = "";
+        groups.forEach(g => {
+          const opt = document.createElement("option");
+          opt.value = g.id;
+          opt.textContent = `${g.label} (${g.totalSpines} ${g.totalSpines === 1 ? 'file' : 'files'})`;
+          charGroupSelect.appendChild(opt);
+        });
+
+        // Populate Background Gallery dropdown
+        if (bgSelect && hierarchyData.backgroundGallery) {
+          bgSelect.innerHTML = "<option value=''>Auto (Character Matching)</option>";
+          hierarchyData.backgroundGallery.forEach(bg => {
+            const opt = document.createElement("option");
+            opt.value = bg.url;
+            opt.textContent = bg.name;
+            bgSelect.appendChild(opt);
+          });
+          bgSelect.onchange = (e) => {
+            if (e.target.value) {
+              currentBgUrl = e.target.value;
+              setBgEnabled(true);
+            } else if (selectedLevel) {
+              currentBgUrl = selectedLevel.bg || (selectedScene ? selectedScene.bg : null);
+            }
+            updateBackgroundImage();
+          };
+        }
+
+        // Default to first group (preferring 5001 / 11100 if present)
+        const defaultGroup = groups.find(g => g.id === "5001") || groups.find(g => g.id === "11100") || groups[0];
+        if (defaultGroup) {
+          charGroupSelect.value = defaultGroup.id;
+          selectGroup(defaultGroup.id);
+        }
+      } catch (err) {
+        // Standalone / GitHub Pages mode without bundled copyrighted assets
+        if (charGroupSection) charGroupSection.style.display = "none";
+        if (sceneSection) sceneSection.style.display = "none";
+        if (levelSection) levelSection.style.display = "none";
+        if (bgSection) bgSection.style.display = "none";
+        showWelcomeCard(
+          "☕ QT-Viewer — Open-Source Asset Player",
+          "Running in standalone static mode (no bundled game assets).<br><br>" +
+          "Drag &amp; drop a folder or files (<code>.skel</code> / <code>.json</code> + <code>.atlas</code> + <code>.png</code>, plus optional background &amp; audio) anywhere on the stage or use the <b>Load Local Assets</b> box.<br><br>" +
+          "You can also drop a <code>.unity3d</code> file to inspect its Unity bundle header."
+        );
+      }
+    }
+
+    charGroupSelect.addEventListener("change", (e) => {
+      if (e.target.value) {
+        selectGroup(e.target.value);
+      }
+    });
+
+    sceneSelect.addEventListener("change", (e) => {
+      if (e.target.value) {
+        selectScene(e.target.value);
+      }
+    });
+
+    function selectGroup(groupId) {
+      if (!hierarchyData) return;
+      selectedGroup = (hierarchyData.groups || []).find(g => g.id === groupId);
+      if (!selectedGroup) return;
+
+      const scenes = selectedGroup.scenes || [];
+      if (sceneCount) sceneCount.textContent = `${scenes.length} ${scenes.length === 1 ? 'scene' : 'scenes'}`;
+      sceneSelect.innerHTML = "";
+      scenes.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.key;
+        opt.textContent = `${s.label} (${s.levels.length} ${s.levels.length === 1 ? 'part' : 'levels/parts'})`;
+        sceneSelect.appendChild(opt);
+      });
+
+      if (scenes.length > 0) {
+        sceneSelect.value = scenes[0].key;
+        selectScene(scenes[0].key);
+      }
+    }
+
+    function selectScene(sceneKey) {
+      if (!selectedGroup) return;
+      selectedScene = (selectedGroup.scenes || []).find(s => s.key === sceneKey);
+      if (!selectedScene) return;
+
+      const levels = selectedScene.levels || [];
+      levelButtonsContainer.innerHTML = "";
+
+      if (levels.length > 1) {
+        levelSection.style.display = "block";
+        if (levelSectionTitle) {
+          levelSectionTitle.textContent = selectedScene.label.includes("CG") ? "Select Story Part" : "Select Difficulty / Level";
+        }
+        levels.forEach((lv, idx) => {
+          const btn = document.createElement("button");
+          btn.className = `level-btn ${idx === 0 ? 'active' : ''}`;
+          btn.textContent = lv.label;
+          btn.dataset.key = lv.key;
+          btn.onclick = () => {
+            levelButtonsContainer.querySelectorAll(".level-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            selectLevel(lv);
+          };
+          levelButtonsContainer.appendChild(btn);
+        });
+      } else {
+        levelSection.style.display = "none";
+      }
+
+      if (levels.length > 0) {
+        selectLevel(levels[0]);
+      }
+    }
+
+    function selectLevel(level) {
+      selectedLevel = level;
+      currentBgUrl = level.bg || (selectedScene ? selectedScene.bg : null);
+      currentAudioMap = level.audio || {};
+      currentReactionPool = (level.reactionPool && level.reactionPool.length > 0)
+        ? level.reactionPool
+        : (level.allVoices || []).map(v => v.url);
+      reactionPoolIndex = 0;
+
+      // Update background image
+      updateBackgroundImage();
+
+      // Update voice & audio list
+      renderAudioList(level.allVoices || []);
+
+      // Load character model
+      currentPmaOverride = null;
+      loadCharacter(level.spineId);
+    }
+
+    if (chkPma) {
+      chkPma.addEventListener("change", () => {
+        const isChecked = chkPma.checked;
+        if (infoPma) infoPma.textContent = isChecked ? "true" : "false";
+        if (currentCharId) {
+          loadCharacter(currentCharId, { pma: isChecked });
+          showToast(`PMA: ${isChecked ? 'ON (Premultiplied)' : 'OFF (Straight Alpha)'}`);
+        }
+      });
+    }
+
+    async function loadCharacter(charId, overrideOptions = {}) {
+      const data = (localCharacterData && localCharacterData.id === charId ? localCharacterData : null)
+        || ((manifestData && manifestData.characters) ? manifestData.characters : []).find(c => c.id === charId)
+        || (selectedLevel ? selectedLevel.spineData : null);
+      if (!data) return;
+      currentCharId = charId;
+
+      if (activeCharacter) {
+        activeCharacter.destroy();
+        activeCharacter = null;
+      }
+      mountEl.innerHTML = "";
+
+      if (overrideOptions.pma !== undefined) {
+        currentPmaOverride = overrideOptions.pma;
+      }
+      const effectivePma = currentPmaOverride !== null ? currentPmaOverride : (data.pma !== undefined ? data.pma : true);
+
+      // Update info card
+      infoCard.style.display = "block";
+      infoId.textContent = data.id;
+      infoVer.textContent = data.spineVersion || "4.1.x";
+      if (chkPma) chkPma.checked = effectivePma;
+      if (infoPma) infoPma.textContent = effectivePma ? "true" : "false";
+      infoBlink.textContent = data.blink ? "Fixed (1.5s)" : "None";
+
+      // Reset Play button state
+      updatePlayButtonUI(true);
+
+      // Determine skin (remember user's skin/costume preference across scenes)
+      const availableSkins = data.skins || [];
+      const charPref = (selectedGroup && charSkinPreferences[selectedGroup.id]) || null;
+      const preferred = (charPref && availableSkins.includes(charPref)) ? charPref
+        : (userPreferredSkin && availableSkins.includes(userPreferredSkin)) ? userPreferredSkin
+        : null;
+
+      const chosenSkin = preferred
+        || data.defaultSkin
+        || (availableSkins.includes("A1") ? "A1" : (availableSkins[0] || "default"));
+
+      function populateCharacterControls(charData, selectedSkin) {
+        const skins = charData.skins || [];
+        skinSelect.innerHTML = "";
+        if (skins.length > 1) {
+          skinSection.style.display = "block";
+          skins.forEach(s => {
+            const opt = document.createElement("option");
+            opt.value = s;
+            opt.textContent = s + (s === "A1" ? " (Full Costume)" : s === "A2" ? " (Alt / Topless)" : s === "default" ? " (Base / Mannequin)" : "");
+            if (s === selectedSkin) opt.selected = true;
+            skinSelect.appendChild(opt);
+          });
+          skinSelect.value = selectedSkin;
+          skinSelect.onchange = (e) => {
+            const newSkin = e.target.value;
+            userPreferredSkin = newSkin;
+            try { localStorage.setItem("ae_preferred_skin", newSkin); } catch (_) {}
+            if (selectedGroup) {
+              charSkinPreferences[selectedGroup.id] = newSkin;
+            }
+            if (activeCharacter) {
+              activeCharacter.setSkin(newSkin);
+              showToast(`Skin: ${newSkin}`);
+            }
+          };
+        } else {
+          skinSection.style.display = "none";
+        }
+
+        // Detect Stateful Sequences (e.g. action_flirty1_in -> action_flirty1 -> action_flirty1_out)
+        const allAnimNames = (charData.animations || []).map(a => a.name);
+        const sequences = [];
+        const sequenceAnimsSet = new Set();
+
+        allAnimNames.forEach(name => {
+          if (name.endsWith("_in")) {
+            const base = name.slice(0, -3);
+            const outName = base + "_out";
+            if (allAnimNames.includes(base) && allAnimNames.includes(outName)) {
+              sequences.push({
+                base: base,
+                inAnim: name,
+                loopAnim: base,
+                outAnim: outName,
+                label: base.replace(/^action_/, "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+              });
+              sequenceAnimsSet.add(name);
+              sequenceAnimsSet.add(base);
+              sequenceAnimsSet.add(outName);
+            }
+          }
+        });
+
+        // Build Intimate Sequence Buttons
+        sequencesBtns.innerHTML = "";
+        if (sequences.length > 0) {
+          sequencesSection.style.display = "block";
+          sequences.forEach(seq => {
+            const btn = document.createElement("button");
+            btn.className = "btn-sequence";
+            btn.dataset.base = seq.base;
+            btn.dataset.label = seq.label;
+            btn.innerHTML = `<span>💋</span> ${seq.label}`;
+            btn.onclick = () => {
+              const isNowActive = activeCharacter.toggleSequence(seq.base);
+              if (isNowActive) {
+                playVoice(seq.base);
+              }
+              sequencesBtns.querySelectorAll(".btn-sequence").forEach(b => {
+                if (b.dataset.base === seq.base && isNowActive) {
+                  b.classList.add("active-sequence");
+                  b.innerHTML = `<span>⏹</span> Stop ${seq.label}`;
+                } else {
+                  b.classList.remove("active-sequence");
+                  b.innerHTML = `<span>💋</span> ${b.dataset.label}`;
+                }
+              });
+              showToast(isNowActive ? `Started ${seq.label} (Looping)` : `Stopped ${seq.label} ➔ Returned to Idle`);
+            };
+            sequencesBtns.appendChild(btn);
+          });
+        } else {
+          sequencesSection.style.display = "none";
+        }
+
+        // Build Interactive Reactions (One-Shots on Track 0)
+        reactionsBtns.innerHTML = "";
+        const rawReactions = charData.reactions || charData.oneShots || [];
+        const reactions = rawReactions.filter(r => !sequenceAnimsSet.has(r));
+        if (reactions.length > 0) {
+          reactionsSection.style.display = "block";
+          reactions.forEach(name => {
+            const btn = document.createElement("button");
+            btn.className = "btn-reaction";
+            btn.textContent = name;
+            btn.onclick = () => {
+              activeCharacter.play(name);
+              playVoice(name);
+              showToast(`Reaction: ${name}`);
+            };
+            reactionsBtns.appendChild(btn);
+          });
+        } else {
+          reactionsSection.style.display = "none";
+        }
+
+        // Build Environmental Scene Loops (Parallel ambient props on Tracks 2+)
+        envLoopsBtns.innerHTML = "";
+        const envLoopsList = charData.envLoops || [];
+        if (envLoopsList.length > 0) {
+          envLoopsSection.style.display = "block";
+          envLoopsList.forEach(name => {
+            const btn = document.createElement("button");
+            btn.className = "btn-env-loop";
+            btn.innerHTML = `<span>●</span> ${name}`;
+            let isEnabled = true;
+            btn.onclick = () => {
+              isEnabled = !isEnabled;
+              activeCharacter.setEnvLoop(name, isEnabled);
+              btn.classList.toggle("off", !isEnabled);
+              btn.querySelector("span").textContent = isEnabled ? "●" : "○";
+              showToast(`${name}: ${isEnabled ? 'ON' : 'OFF'}`);
+            };
+            envLoopsBtns.appendChild(btn);
+          });
+        } else {
+          envLoopsSection.style.display = "none";
+        }
+
+        // Build Base Idle Loop Selector (Track 0)
+        idleBtns.innerHTML = "";
+        const baseIdleName = charData.baseIdle || (charData.loops && charData.loops[0]) || "idle";
+        const idleCandidates = [baseIdleName];
+        if (charData.loops) {
+          charData.loops.forEach(l => {
+            if (!idleCandidates.includes(l) && !envLoopsList.includes(l)) {
+              idleCandidates.push(l);
+            }
+          });
+        }
+        if (idleCandidates.length > 0 && (charData.animations || []).length > 0) {
+          idleSection.style.display = "block";
+          idleCandidates.forEach((loopName, i) => {
+            const btn = document.createElement("button");
+            btn.textContent = loopName;
+            if (i === 0) btn.classList.add("active");
+            btn.onclick = () => {
+              idleBtns.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+              btn.classList.add("active");
+              activeCharacter.loop(loopName);
+              showToast(`Base Idle: ${loopName}`);
+            };
+            idleBtns.appendChild(btn);
+          });
+        } else {
+          idleSection.style.display = "none";
+        }
+      }
+
+      populateCharacterControls(data, chosenSkin);
+      const envLoops = data.envLoops || [];
+      const baseIdle = data.baseIdle || (data.loops && data.loops[0]) || "idle";
+
+      // Instantiate SpineCharacter
+      const isFreshLocal = !!(data.rawDataURIs && (!data.animations || data.animations.length === 0));
+      activeCharacter = await SpineCharacter.create(mountEl, {
+        basePath: data.rawDataURIs ? "" : `characters/${data.id}/`,
+        skeleton: data.skeleton || "skeleton.skel",
+        atlas: data.atlas || "skeleton.atlas",
+        isJson: !!data.isJson,
+        rawDataURIs: data.rawDataURIs || null,
+        idle: isFreshLocal ? null : baseIdle,
+        blink: data.blink || null,
+        envLoops: envLoops,
+        skin: isFreshLocal ? null : chosenSkin,
+        defaultSkin: isFreshLocal ? null : chosenSkin,
+        premultipliedAlpha: effectivePma,
+        mix: 0.25,
+        speed: currentSpeed
+      });
+
+      // If loaded from local files without manifest metadata, populate controls from skeleton.data
+      if (isFreshLocal && activeCharacter?.player?.skeleton?.data) {
+        const skData = activeCharacter.player.skeleton.data;
+        data.spineVersion = skData.version || "4.1.x";
+        infoVer.textContent = data.spineVersion;
+        data.skins = (skData.skins || []).map(s => s.name);
+        data.animations = (skData.animations || []).map(a => ({ name: a.name, duration: Number(a.duration.toFixed(2)) }));
+        const animNames = data.animations.map(a => a.name);
+        data.blink = animNames.find(n => /blink/i.test(n)) || null;
+        infoBlink.textContent = data.blink ? "Fixed (1.5s)" : "None";
+        data.loops = animNames.filter(n => /^(idle|loop|stand|breath)/i.test(n));
+        if (data.loops.length === 0 && animNames.length > 0) data.loops = [animNames[0]];
+        data.baseIdle = data.loops[0] || animNames[0] || "idle";
+        data.reactions = animNames.filter(n => n !== data.blink && !data.loops.includes(n));
+        const localSkin = data.skins.includes("A1") ? "A1" : (data.skins[0] || "default");
+        activeCharacter.setSkin(localSkin);
+        activeCharacter.loop(data.baseIdle);
+        if (data.blink) activeCharacter.startBlinking(data.blink);
+        populateCharacterControls(data, localSkin);
+      }
+
+      // Reset camera zoom & pan and apply in-game framing
+      if (activeCharacter) {
+        activeCharacter._setupInGameFraming();
+        // Store the original (unadjusted) viewport for adjust mode reference
+        activeCharacter.originalBaseViewport = Object.assign({}, activeCharacter.player.currentViewport);
+      }
+      currentZoom = 1.0;
+      panX = 0;
+      panY = 0;
+      mountEl.style.transform = "none";
+      applyCameraTransform();
+      // Apply saved crop
+      applySceneCrop(currentCharId);
+      // Update adjust panel if in adjust mode
+      syncAdjustPanel(currentCharId);
+
+      // Canvas click reaction feedback
+      if (activeCharacter.canvas) {
+        activeCharacter.canvas.addEventListener("click", () => {
+          if (!hasDragged) {
+            showToast("Interactive Click: Reaction triggered");
+            playVoice("touch");
+          }
+        });
+      }
+    }
+
+    // --- Native WebGL Camera Zoom & Pan Controls ---
+    let currentZoom = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let startX = 0, startY = 0;
+    let initialPanX = 0, initialPanY = 0;
+    let hasDragged = false;
+
+    const stageEl = document.getElementById("stage-container");
+    const zoomResetBtn = document.getElementById("btn-zoom-reset");
+
+    function updateBackgroundImageTransform() {
+      if (!stageBgImg) return;
+      if (!bgEnabled || !currentBgUrl) {
+        stageBgImg.style.display = "none";
+        return;
+      }
+      stageBgImg.style.display = "block";
+      if (!activeCharacter || !activeCharacter.player || !activeCharacter.originalBaseViewport) {
+        stageBgImg.style.left = "0px";
+        stageBgImg.style.top = "0px";
+        stageBgImg.style.width = "100%";
+        stageBgImg.style.height = "100%";
+        stageBgImg.style.objectFit = "cover";
+        return;
+      }
+
+      const p = activeCharacter.player;
+      const obv = activeCharacter.originalBaseViewport;
+      const canvasW = p.canvas.clientWidth || stageEl.clientWidth || 800;
+      const canvasH = p.canvas.clientHeight || stageEl.clientHeight || 800;
+
+      // Scene camera viewport (depends ONLY on obv, currentZoom, panX, panY - NOT on spine adjustment!)
+      const sceneVpW = obv.width / currentZoom;
+      const sceneVpH = obv.height / currentZoom;
+      const scaleX = obv.width / canvasW;
+      const scaleY = obv.height / canvasH;
+      const sceneVpX = (obv.x + obv.width / 2) - sceneVpW / 2 - (panX * scaleX);
+      const sceneVpY = (obv.y + obv.height / 2) - sceneVpH / 2 + (panY * scaleY);
+
+      let bgW = stageBgImg.naturalWidth || 3362;
+      let bgH = stageBgImg.naturalHeight || 3362;
+      // In Aeon's Echo, 1680x720 AVG backgrounds are half-scale of 3360x1440 world bounds
+      if (bgW === 1680 && bgH === 720) {
+        bgW = 3360;
+        bgH = 1440;
+      }
+
+      // Exact WebGL Orthographic projection from Spine world coordinates to screen pixels
+      const left = (-bgW / 2 - sceneVpX) / sceneVpW * canvasW;
+      const right = (bgW / 2 - sceneVpX) / sceneVpW * canvasW;
+      const top = (sceneVpY + sceneVpH - bgH / 2) / sceneVpH * canvasH;
+      const bottom = (sceneVpY + sceneVpH - (-bgH / 2)) / sceneVpH * canvasH;
+
+      stageBgImg.style.left = `${left}px`;
+      stageBgImg.style.top = `${top}px`;
+      stageBgImg.style.width = `${right - left}px`;
+      stageBgImg.style.height = `${bottom - top}px`;
+      stageBgImg.style.objectFit = "fill";
+    }
+
+    function applyCameraTransform() {
+      if (!activeCharacter || !activeCharacter.player || !activeCharacter.originalBaseViewport) return;
+      const p = activeCharacter.player;
+      const obv = activeCharacter.originalBaseViewport;
+
+      const canvasW = p.canvas.clientWidth || stageEl.clientWidth || 800;
+      const canvasH = p.canvas.clientHeight || stageEl.clientHeight || 800;
+
+      // Base scene camera viewport
+      const sceneVpW = obv.width / currentZoom;
+      const sceneVpH = obv.height / currentZoom;
+      const scaleX = obv.width / canvasW;
+      const scaleY = obv.height / canvasH;
+      const sceneVpX = (obv.x + obv.width / 2) - sceneVpW / 2 - (panX * scaleX);
+      const sceneVpY = (obv.y + obv.height / 2) - sceneVpH / 2 + (panY * scaleY);
+
+      // Spine adjustment: read from live adjust controls if in adjust mode, else saved adjustments
+      const adj = (currentCharId && sceneAdjustments[currentCharId]) || {};
+      const s = (adjustMode && adjScale) ? (parseFloat(adjScale.value) || 1) : (adj.scale || 1);
+      const ox = (adjustMode && adjX) ? (parseFloat(adjX.value) || 0) : (adj.offsetX || 0);
+      const oy = (adjustMode && adjY) ? (parseFloat(adjY.value) || 0) : (adj.offsetY || 0);
+
+      // Spine viewport: scale and offset relative to the scene camera
+      p.currentViewport.width = sceneVpW / s;
+      p.currentViewport.height = sceneVpH / s;
+
+      const centerX = sceneVpX + sceneVpW / 2;
+      const centerY = sceneVpY + sceneVpH / 2;
+
+      p.currentViewport.x = (centerX - p.currentViewport.width / 2) - (ox * scaleX / currentZoom);
+      p.currentViewport.y = (centerY - p.currentViewport.height / 2) + (oy * scaleY / currentZoom);
+
+      mountEl.style.transform = "none";
+
+      if (zoomResetBtn) {
+        zoomResetBtn.textContent = `${Math.round(currentZoom * 100)}%`;
+      }
+
+      updateBackgroundImageTransform();
+    }
+
+    function setZoom(factor, clientX, clientY) {
+      const oldZoom = currentZoom;
+      // Allow seamless camera zoom from 0.4x up to 4.5x
+      const newZoom = Math.min(Math.max(currentZoom * factor, 0.4), 4.5);
+      if (clientX !== undefined && clientY !== undefined) {
+        const rect = stageEl.getBoundingClientRect();
+        const cx = clientX - (rect.left + rect.width / 2);
+        const cy = clientY - (rect.top + rect.height / 2);
+        panX -= cx * (1 / oldZoom - 1 / newZoom);
+        panY += cy * (1 / oldZoom - 1 / newZoom);
+      }
+      currentZoom = newZoom;
+      applyCameraTransform();
+    }
+
+    window.addEventListener("resize", () => {
+      applyCameraTransform();
+    });
+
+    let initialAdjX = 0, initialAdjY = 0;
+
+    // Mouse Wheel Zoom (Native Camera Viewport or Adjust Mode Spine Scale)
+    stageEl.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      if (adjustMode) {
+        // In adjust mode: mouse wheel adjusts the SPINE scale while keeping background still!
+        const factor = e.deltaY < 0 ? 1.05 : 0.95;
+        const currentScale = parseFloat(adjScale.value) || 1;
+        const newScale = Math.min(Math.max(currentScale * factor, 0.2), 3.0);
+        adjScale.value = newScale.toFixed(2);
+        adjScaleVal.textContent = newScale.toFixed(2) + "×";
+        applyCameraTransform();
+      } else {
+        const factor = e.deltaY < 0 ? 1.15 : 0.85;
+        setZoom(factor, e.clientX, e.clientY);
+      }
+    }, { passive: false });
+
+    // Drag to Pan
+    stageEl.addEventListener("mousedown", (e) => {
+      if (e.target.closest("#zoom-toolbar") || e.target.closest("#click-toast") || e.target.closest("#adjust-panel") || e.target.closest(".crop-handle")) return;
+      isPanning = true;
+      hasDragged = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      initialPanX = panX;
+      initialPanY = panY;
+      if (adjustMode) {
+        initialAdjX = parseFloat(adjX.value) || 0;
+        initialAdjY = parseFloat(adjY.value) || 0;
+      }
+      stageEl.style.cursor = "grabbing";
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isPanning) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.hypot(dx, dy) > 4) {
+        hasDragged = true;
+      }
+      if (adjustMode) {
+        // In adjust mode: dragging moves the SPINE relative to the background! Background stays STILL!
+        const newX = Math.round(initialAdjX + dx);
+        const newY = Math.round(initialAdjY + dy);
+        adjX.value = newX;
+        adjY.value = newY;
+        adjXVal.textContent = newX;
+        adjYVal.textContent = newY;
+        applyCameraTransform();
+      } else {
+        panX = initialPanX + dx;
+        panY = initialPanY + dy;
+        applyCameraTransform();
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (isPanning) {
+        isPanning = false;
+        stageEl.style.cursor = "default";
+      }
+    });
+
+    // Double-click to reset zoom & pan
+    stageEl.addEventListener("dblclick", (e) => {
+      if (e.target.closest("#zoom-toolbar") || e.target.closest("#adjust-panel")) return;
+      if (adjustMode) {
+        adjScale.value = 1;
+        adjX.value = 0;
+        adjY.value = 0;
+        liveApplyAdjust();
+        showToast("Spine position reset to default");
+      } else {
+        currentZoom = 1.0;
+        panX = 0;
+        panY = 0;
+        applyCameraTransform();
+        showToast("Camera reset to 100%");
+      }
+    });
+
+    // Zoom Toolbar Buttons
+    document.getElementById("btn-zoom-in").onclick = () => setZoom(1.25);
+    document.getElementById("btn-zoom-out").onclick = () => setZoom(0.8);
+    document.getElementById("btn-zoom-reset").onclick = () => {
+      currentZoom = 1.0;
+      panX = 0;
+      panY = 0;
+      applyCameraTransform();
+      showToast("Camera reset to 100%");
+    };
+
+    function showToast(text) {
+      toastEl.textContent = text;
+      toastEl.style.opacity = "1";
+      setTimeout(() => { toastEl.style.opacity = "0"; }, 1500);
+    }
+
+    window.loadCharacter = loadCharacter;
+    window.getActiveCharacter = () => activeCharacter;
+    window.getCurrentSkin = () => (activeCharacter ? activeCharacter.currentSkin : null);
+    window.getUserPreferredSkin = () => userPreferredSkin;
+    window.playVoice = playVoice;
+    window.getCurrentAudioMap = () => currentAudioMap;
+    window.getCurrentReactionPool = () => currentReactionPool;
+
+    // =========================================================
+    // ===== ADJUST MODE: Scale, Offset, Crop per scene ========
+    // =========================================================
+
+    function getAdjForScene(charId) {
+      return sceneAdjustments[charId] || null;
+    }
+
+    function applySceneAdjustment(charId) {
+      if (!activeCharacter || !activeCharacter.player || !activeCharacter.originalBaseViewport) return;
+      const adj = getAdjForScene(charId);
+      if (!adj) return;
+      const p = activeCharacter.player;
+      const obv = activeCharacter.originalBaseViewport;
+      const scale = adj.scale || 1;
+      // Smaller viewport = bigger spine on screen
+      p.currentViewport.width = obv.width / scale;
+      p.currentViewport.height = obv.height / scale;
+      // Offset: shift viewport center (offsetX+ = spine moves right = vp.x decreases)
+      p.currentViewport.x = obv.x - (adj.offsetX || 0);
+      // offsetY+ = spine moves down = viewport.y increases
+      p.currentViewport.y = obv.y + (adj.offsetY || 0);
+    }
+
+    function applySceneCrop(charId) {
+      const adj = getAdjForScene(charId);
+      if (!adj || !adj.crop || adjustMode) {
+        sceneContent.style.clipPath = "";
+        return;
+      }
+      const c = adj.crop;
+      sceneContent.style.clipPath = `inset(${c.top}% ${c.right}% ${c.bottom}% ${c.left}%)`;
+    }
+
+    function syncAdjustPanel(charId) {
+      if (!adjustMode) return;
+      adjSceneId.textContent = charId || "—";
+      const adj = getAdjForScene(charId) || { scale: 1, offsetX: 0, offsetY: 0 };
+      adjScale.value = adj.scale || 1;
+      adjScaleVal.textContent = (adj.scale || 1).toFixed(2) + "×";
+      adjX.value = adj.offsetX || 0;
+      adjXVal.textContent = adj.offsetX || 0;
+      adjY.value = adj.offsetY || 0;
+      adjYVal.textContent = adj.offsetY || 0;
+      // Crop
+      if (adj.crop) {
+        adjCropToggle.checked = true;
+        showCropOverlay(adj.crop);
+      } else {
+        adjCropToggle.checked = false;
+        cropOverlay.style.display = "none";
+      }
+    }
+
+    function liveApplyAdjust() {
+      if (!activeCharacter || !activeCharacter.player || !activeCharacter.originalBaseViewport || !currentCharId) return;
+      const scale = parseFloat(adjScale.value) || 1;
+      const offsetX = parseFloat(adjX.value) || 0;
+      const offsetY = parseFloat(adjY.value) || 0;
+      adjScaleVal.textContent = scale.toFixed(2) + "×";
+      adjXVal.textContent = offsetX;
+      adjYVal.textContent = offsetY;
+      applyCameraTransform();
+    }
+
+    adjScale.addEventListener("input", liveApplyAdjust);
+    adjX.addEventListener("input", liveApplyAdjust);
+    adjY.addEventListener("input", liveApplyAdjust);
+
+    // --- Toggle adjust mode ---
+    btnToggleAdjust.onclick = () => {
+      adjustMode = !adjustMode;
+      btnToggleAdjust.classList.toggle("active", adjustMode);
+      btnToggleAdjust.textContent = adjustMode ? "✏️ Editing" : "✏️ Adjust";
+      adjustPanel.style.display = adjustMode ? "block" : "none";
+      if (adjustMode) {
+        // Remove clip so user can see edges
+        sceneContent.style.clipPath = "";
+        syncAdjustPanel(currentCharId);
+        applyCameraTransform();
+      } else {
+        // Re-apply clip and hide crop overlay
+        cropOverlay.style.display = "none";
+        applySceneCrop(currentCharId);
+        applyCameraTransform();
+      }
+    };
+
+    // --- Save button ---
+    document.getElementById("btn-adj-save").onclick = async () => {
+      if (!currentCharId) return;
+      const scale = parseFloat(adjScale.value) || 1;
+      const offsetX = parseFloat(adjX.value) || 0;
+      const offsetY = parseFloat(adjY.value) || 0;
+      const entry = { scale, offsetX, offsetY };
+      // Read crop if active
+      if (adjCropToggle.checked && cropOverlay.style.display !== "none") {
+        const stageW = stageEl.clientWidth;
+        const stageH = stageEl.clientHeight;
+        const ol = parseFloat(cropOverlay.style.left) || 0;
+        const ot = parseFloat(cropOverlay.style.top) || 0;
+        const ow = parseFloat(cropOverlay.style.width) || stageW;
+        const oh = parseFloat(cropOverlay.style.height) || stageH;
+        entry.crop = {
+          top:    Math.max(0, (ot / stageH) * 100),
+          right:  Math.max(0, ((stageW - ol - ow) / stageW) * 100),
+          bottom: Math.max(0, ((stageH - ot - oh) / stageH) * 100),
+          left:   Math.max(0, (ol / stageW) * 100)
+        };
+      }
+      // Only save non-default
+      if (scale === 1 && offsetX === 0 && offsetY === 0 && !entry.crop) {
+        delete sceneAdjustments[currentCharId];
+      } else {
+        sceneAdjustments[currentCharId] = entry;
+      }
+      try {
+        localStorage.setItem("qt_scene_adjustments", JSON.stringify(sceneAdjustments));
+      } catch (_) {}
+      try {
+        const res = await fetch("/api/save-adjustments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sceneAdjustments)
+        });
+        if (res.ok) {
+          showToast(`💾 Saved adjustments for ${currentCharId}`);
+        } else {
+          showToast(`💾 Saved in browser storage for ${currentCharId}`);
+        }
+      } catch (e) {
+        showToast(`💾 Saved in browser storage for ${currentCharId}`);
+      }
+    };
+
+    // --- Reset button ---
+    document.getElementById("btn-adj-reset").onclick = () => {
+      if (!currentCharId) return;
+      adjScale.value = 1;
+      adjX.value = 0;
+      adjY.value = 0;
+      adjCropToggle.checked = false;
+      cropOverlay.style.display = "none";
+      liveApplyAdjust();
+      showToast("🔄 Reset adjustments (not saved yet)");
+    };
+
+    // --- Crop overlay logic ---
+    function showCropOverlay(crop) {
+      const stageW = stageEl.clientWidth;
+      const stageH = stageEl.clientHeight;
+      const cl = crop ? (crop.left / 100) * stageW : 0;
+      const ct = crop ? (crop.top / 100) * stageH : 0;
+      const cr = crop ? (crop.right / 100) * stageW : 0;
+      const cb = crop ? (crop.bottom / 100) * stageH : 0;
+      cropOverlay.style.left = cl + "px";
+      cropOverlay.style.top = ct + "px";
+      cropOverlay.style.width = (stageW - cl - cr) + "px";
+      cropOverlay.style.height = (stageH - ct - cb) + "px";
+      cropOverlay.style.display = "block";
+    }
+
+    adjCropToggle.onchange = () => {
+      if (adjCropToggle.checked) {
+        const adj = getAdjForScene(currentCharId);
+        showCropOverlay(adj ? adj.crop : null);
+      } else {
+        cropOverlay.style.display = "none";
+      }
+    };
+
+    // --- Draggable crop handles ---
+    let cropDragType = null;
+    let cropDragStart = {};
+
+    cropOverlay.querySelectorAll(".crop-handle").forEach(handle => {
+      handle.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (handle.classList.contains("crop-handle-top")) cropDragType = "top";
+        else if (handle.classList.contains("crop-handle-bottom")) cropDragType = "bottom";
+        else if (handle.classList.contains("crop-handle-left")) cropDragType = "left";
+        else if (handle.classList.contains("crop-handle-right")) cropDragType = "right";
+        cropDragStart = {
+          mx: e.clientX,
+          my: e.clientY,
+          left: parseFloat(cropOverlay.style.left) || 0,
+          top: parseFloat(cropOverlay.style.top) || 0,
+          width: parseFloat(cropOverlay.style.width) || stageEl.clientWidth,
+          height: parseFloat(cropOverlay.style.height) || stageEl.clientHeight
+        };
+      });
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!cropDragType) return;
+      const dx = e.clientX - cropDragStart.mx;
+      const dy = e.clientY - cropDragStart.my;
+      const stageW = stageEl.clientWidth;
+      const stageH = stageEl.clientHeight;
+      let { left, top, width, height } = cropDragStart;
+      if (cropDragType === "top") {
+        const newTop = Math.max(0, Math.min(top + height - 40, top + dy));
+        const diff = newTop - top;
+        cropOverlay.style.top = newTop + "px";
+        cropOverlay.style.height = (height - diff) + "px";
+      } else if (cropDragType === "bottom") {
+        const newH = Math.max(40, Math.min(stageH - top, height + dy));
+        cropOverlay.style.height = newH + "px";
+      } else if (cropDragType === "left") {
+        const newLeft = Math.max(0, Math.min(left + width - 40, left + dx));
+        const diff = newLeft - left;
+        cropOverlay.style.left = newLeft + "px";
+        cropOverlay.style.width = (width - diff) + "px";
+      } else if (cropDragType === "right") {
+        const newW = Math.max(40, Math.min(stageW - left, width + dx));
+        cropOverlay.style.width = newW + "px";
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      cropDragType = null;
+    });
+
+    // Load adjustments file on startup (plus localStorage fallback for GitHub Pages)
+    async function loadAdjustments() {
+      try {
+        const saved = localStorage.getItem("qt_scene_adjustments");
+        if (saved) sceneAdjustments = JSON.parse(saved);
+      } catch (_) {}
+      try {
+        const res = await fetch("./characters/scene_adjustments.json?t=" + Date.now());
+        if (res.ok) {
+          const remoteAdj = await res.json();
+          sceneAdjustments = Object.assign({}, remoteAdj, sceneAdjustments);
+        }
+      } catch (e) {
+        // Static / GitHub Pages mode without scene_adjustments.json
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

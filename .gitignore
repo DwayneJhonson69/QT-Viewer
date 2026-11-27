@@ -1,0 +1,44 @@
+# Local game assets / user files (never commit copyrighted assets)
+characters/
+Downloaded_Assets/
+archive/
+reports/
+Tools/
+*.unity3d
+*.bundle
+*.skel
+*.skel.bytes
+*.skel.txt
+*.atlas
+*.atlas.txt
+*.png
+*.webp
+*.jpg
+*.jpeg
+*.mp3
+*.wav
+*.ogg
+
+# AI / Editor / Local tooling
+.claude/
+.claude/**
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+.env
+.env.*
+*.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Node / OS
+node_modules/
+.DS_Store
+Thumbs.db
+desktop.ini

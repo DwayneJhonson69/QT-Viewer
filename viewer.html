@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>QT-Viewer — Quick Spine Test Viewer</title>
+  <link rel="stylesheet" href="./vendor/spine-player.css">
+  <style>
+    :root {
+      --bg: #12141d;
+      --card-bg: #1a1e2b;
+      --accent: #6366f1;
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html { width: 100vw; height: 100vh; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+    #container { display: flex; width: 100vw; height: 100vh; }
+    #viewport-pane { flex: 1; height: 100%; position: relative; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle, #1e2438 0%, #0d0f17 100%); }
+    #player-mount { width: 100%; height: 100%; }
+    #sidebar-pane { width: 360px; height: 100%; background: var(--card-bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
+    .header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .header h2 { font-size: 16px; font-weight: 700; }
+    .header a { color: var(--muted); font-size: 12px; text-decoration: none; }
+    .header a:hover { color: #fff; }
+    .drop-zone { margin: 12px 16px; padding: 14px; border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px; text-align: center; font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.2s; }
+    .drop-zone.dragover { border-color: var(--accent); background: rgba(99, 102, 241, 0.1); color: #fff; }
+    .scroll-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+    select, button { width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 13px; outline: none; }
+    button { background: rgba(255,255,255,0.08); cursor: pointer; transition: background 0.15s; }
+    button:hover { background: rgba(255,255,255,0.15); }
+    .anim-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .anim-btn { width: auto; font-size: 12px; padding: 6px 10px; border-radius: 4px; }
+    .anim-btn.active { background: var(--accent); }
+    .info-box { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 12px; line-height: 1.6; }
+    .info-box span { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="viewport-pane">
+      <div id="player-mount"></div>
+    </div>
+    <div id="sidebar-pane">
+      <div class="header">
+        <h2>QT-Viewer (Quick Test)</h2>
+        <a href="./index.html">Full Stage ↗</a>
+      </div>
+
+      <div class="drop-zone" id="drop-target">
+        Drop <b>.skel / .json + .atlas + .png</b> (or folder / <code>.unity3d</code>) here, or click to browse
+        <input type="file" id="file-input" multiple style="display:none;">
+      </div>
+
+      <div class="scroll-area">
+        <div id="manifest-wrap">
+          <div class="label">Character</div>
+          <select id="char-list"><option value="">Loading...</option></select>
+        </div>
+
+        <div class="info-box" id="stats-box" style="display:none;">
+          <div><span>ID:</span> <b id="stat-id">-</b></div>
+          <div><span>Spine Version:</span> <b id="stat-ver">-</b></div>
+          <div><span>Bones:</span> <b id="stat-bones">-</b></div>
+          <div><span>PMA:</span> <b id="stat-pma">-</b></div>
+        </div>
+
+        <div id="skin-wrap" style="display:none;">
+          <div class="label">Skins</div>
+          <select id="skin-list"></select>
+        </div>
+
+        <div id="anim-wrap" style="display:none;">
+          <div class="label">Animations (Click to play)</div>
+          <div class="anim-grid" id="anim-list"></div>
+        </div>
+
+        <div>
+          <div class="label">Options</div>
+          <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="chk-pma" checked> Premultiplied Alpha (PMA)
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./vendor/spine-player.js"></script>
+  <script type="module">
+    import { readDroppedFiles, buildLocalSpineBundle } from './src/localLoader.js';
+
+    let currentPlayer = null;
+    let characters = [];
+    let currentData = null;
+
+    const charList = document.getElementById('char-list');
+    const manifestWrap = document.getElementById('manifest-wrap');
+    const skinList = document.getElementById('skin-list');
+    const animList = document.getElementById('anim-list');
+    const statsBox = document.getElementById('stats-box');
+    const statId = document.getElementById('stat-id');
+    const statVer = document.getElementById('stat-ver');
+    const statBones = document.getElementById('stat-bones');
+    const statPma = document.getElementById('stat-pma');
+    const skinWrap = document.getElementById('skin-wrap');
+    const animWrap = document.getElementById('anim-wrap');
+    const chkPma = document.getElementById('chk-pma');
+    const dropTarget = document.getElementById('drop-target');
+    const fileInput = document.getElementById('file-input');
+
+    async function init() {
+      try {
+        const res = await fetch('./characters/characters.json');
+        if (!res.ok) throw new Error('No local manifest');
+        const json = await res.json();
+        characters = json.characters || [];
+        populateSelect();
+      } catch (e) {
+        manifestWrap.style.display = 'none';
+        document.getElementById('player-mount').innerHTML =
+          '<div style="padding:40px;color:#9ca3af;text-align:center;line-height:1.6;">' +
+          '<b style="color:#f3f4f6;font-size:16px;">Ready for Local Assets</b><br>' +
+          'Drop extracted Spine files (<code>.skel</code>/<code>.json</code> + <code>.atlas</code> + <code>.png</code>) on the right panel to preview.' +
+          '</div>';
+      }
+    }
+
+    function populateSelect() {
+      charList.innerHTML = '';
+      characters.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.id} (${c.animations ? c.animations.length : 0} anims)`;
+        charList.appendChild(opt);
+      });
+      if (characters.length > 0) {
+        charList.value = characters[0].id;
+        loadCharacter(characters[0]);
+      }
+    }
+
+    charList.onchange = (e) => {
+      const char = characters.find(c => c.id === e.target.value);
+      if (char) loadCharacter(char);
+    };
+    chkPma.onchange = () => { if (currentData) loadCharacter(currentData); };
+
+    function loadCharacter(char) {
+      if (!char) return;
+      currentData = char;
+
+      if (currentPlayer) {
+        try { currentPlayer.dispose(); } catch (e) {}
+        currentPlayer = null;
+      }
+
+      document.getElementById('player-mount').innerHTML = '';
+
+      statId.textContent = char.id;
+      statVer.textContent = char.spineVersion || '4.1.x';
+      statPma.textContent = chkPma.checked ? 'true' : 'false';
+      statsBox.style.display = 'block';
+
+      const firstAnim = (char.animations && char.animations[0]) ? char.animations[0].name : undefined;
+      const initialSkin = char.defaultSkin || ((char.skins && char.skins.includes('A1')) ? 'A1' : ((char.skins && char.skins[0]) ? char.skins[0] : 'default'));
+
+      const cfg = {
+        atlasUrl: char.rawDataURIs ? char.atlas : `./characters/${char.id}/${char.atlas}`,
+        premultipliedAlpha: chkPma.checked,
+        backgroundColor: '#00000000',
+        alpha: true,
+        showControls: false,
+        rawDataURIs: char.rawDataURIs || undefined,
+        success: (player) => {
+          const skData = player.skeleton?.data;
+          if (skData) {
+            statBones.textContent = skData.bones.length;
+            if (skData.version) statVer.textContent = skData.version;
+          }
+
+          const skins = (char.skins && char.skins.length) ? char.skins : (skData ? skData.skins.map(s => s.name) : []);
+          const chosenSkin = skins.includes(initialSkin) ? initialSkin : (skins[0] || 'default');
+          skinList.innerHTML = '';
+          if (skins.length > 1) {
+            skinWrap.style.display = 'block';
+            skins.forEach(s => {
+              const opt = document.createElement('option');
+              opt.value = s;
+              opt.textContent = s;
+              if (s === chosenSkin) opt.selected = true;
+              skinList.appendChild(opt);
+            });
+            try {
+              player.config.skin = chosenSkin;
+              player.skeleton.setSkinByName(chosenSkin);
+              player.skeleton.setSlotsToSetupPose();
+            } catch (e) {}
+            skinList.onchange = (e) => {
+              if (player && player.skeleton) {
+                player.config.skin = e.target.value;
+                player.skeleton.setSkinByName(e.target.value);
+                player.skeleton.setSlotsToSetupPose();
+              }
+            };
+          } else {
+            skinWrap.style.display = 'none';
+          }
+
+          const anims = (char.animations && char.animations.length)
+            ? char.animations
+            : (skData ? skData.animations.map(a => ({ name: a.name, duration: Number(a.duration.toFixed(2)) })) : []);
+          animList.innerHTML = '';
+          if (anims.length > 0) {
+            animWrap.style.display = 'block';
+            anims.forEach((a, idx) => {
+              const btn = document.createElement('button');
+              btn.className = 'anim-btn';
+              if (idx === 0) btn.classList.add('active');
+              btn.textContent = `${a.name} (${a.duration}s)`;
+              btn.onclick = () => {
+                animList.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                player.setAnimation(a.name, true);
+              };
+              animList.appendChild(btn);
+            });
+          } else {
+            animWrap.style.display = 'none';
+          }
+
+          player.play();
+        },
+        error: (player, msg) => {
+          console.error('SpinePlayer Error:', msg);
+          document.getElementById('player-mount').innerHTML = `<div style="padding:40px;color:#ff6b6b;">Error loading character: ${msg}</div>`;
+        }
+      };
+
+      if (firstAnim) cfg.animation = firstAnim;
+      if (initialSkin) cfg.skin = initialSkin;
+      if (char.isJson) {
+        cfg.jsonUrl = char.rawDataURIs ? char.skeleton : `./characters/${char.id}/${char.skeleton}`;
+      } else {
+        cfg.skelUrl = char.rawDataURIs ? char.skeleton : `./characters/${char.id}/${char.skeleton}`;
+      }
+
+      currentPlayer = new spine.SpinePlayer('player-mount', cfg);
+    }
+
+    async function handleFiles(fileList) {
+      const bundle = await buildLocalSpineBundle(fileList);
+      if (bundle.ready) {
+        loadCharacter({
+          id: bundle.id,
+          skeleton: bundle.skelKey,
+          atlas: bundle.atlasKey,
+          isJson: bundle.isJson,
+          rawDataURIs: bundle.rawDataURIs,
+          skins: [],
+          animations: []
+        });
+      } else if (bundle.unityBundles.length > 0) {
+        const b = bundle.unityBundles[0];
+        document.getElementById('player-mount').innerHTML =
+          `<div style="padding:32px;max-width:520px;line-height:1.6;color:#e5e7eb;">` +
+          `<h3 style="color:#a5b4fc;margin-bottom:8px;">Unity Bundle Detected (${b.fileName})</h3>` +
+          `<div>Format: <b>${b.signature}</b> (v${b.formatVersion ?? '?'})</div>` +
+          `<div>Unity Engine: <b>${b.engineVersion}</b> • Size: <b>${(b.size / 1024).toFixed(1)} KB</b></div>` +
+          `<p style="margin-top:12px;color:#9ca3af;font-size:13px;">Direct in-browser extraction of Spine assets from <code>.unity3d</code> bundles is an open community goal for QT-Viewer. For now, extract <code>.skel</code> + <code>.atlas</code> + <code>.png</code> via AssetStudio and drop them here.</p>` +
+          `</div>`;
+      } else {
+        alert('Please include a .skel (or Spine .json), a .atlas file, and its .png texture image(s).');
+      }
+    }
+
+    dropTarget.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => { if (e.target.files?.length) handleFiles(e.target.files); };
+    dropTarget.addEventListener('dragover', (e) => { e.preventDefault(); dropTarget.classList.add('dragover'); });
+    dropTarget.addEventListener('dragleave', () => dropTarget.classList.remove('dragover'));
+    dropTarget.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropTarget.classList.remove('dragover');
+      const files = await readDroppedFiles(e.dataTransfer);
+      if (files.length) handleFiles(files);
+    });
+
+    init();
+  </script>
+</body>
+</html>
