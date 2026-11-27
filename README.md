@@ -4,6 +4,8 @@
 
 # QT-Viewer
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a-Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/qtviewer)
+
 An open-source, browser-based player and inspector for **Spine 2D** & **Unity (`.unity3d`)** game assets. Designed to run both **100% statically on GitHub Pages** (drag-and-drop local files directly in your browser) and locally with full scene/manifest support.
 
 ---
