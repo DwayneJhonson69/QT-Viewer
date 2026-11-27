@@ -79,8 +79,6 @@ Whether it's the price of a coffee or simply sharing the GitHub repository, ever
 
 Thanks for supporting independent open-source development! ❤️
 
-☕ Every coffee helps keep the project brewing.
-
-> *[Coffee link coming soon]*
+☕ Every coffee helps keep the project brewing: **[Buy Me a Coffee](https://buymeacoffee.com/qtviewer)**
 
 **Disclaimer:** This project is an independent community-developed tool and is not affiliated with, endorsed by, or associated with Unity Technologies or any video game publisher. Users are responsible for ensuring they have the necessary rights and permissions to access and use any files they load. The project does not distribute copyrighted game assets.
